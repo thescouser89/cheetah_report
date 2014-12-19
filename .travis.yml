@@ -9,15 +9,16 @@ after_success:
 - git config --global user.email ${GIT_EMAIL}
 - git config --global user.name ${GIT_NAME}
 
-- git clone --quiet --branch=master https://${GH_TOKEN}@github.com/thescouser89/cheetah_report report_for_cheetah > /dev/null
+- git clone --quiet --branch=gh-pages https://${GH_TOKEN}@github.com/thescouser89/cheetah_report report_for_cheetah > /dev/null
 
-- cd report_for_cheetah/reports_pdf_travis
+- cd report_for_cheetah/
 - cp -f $HOME/build/thescouser89/cheetah_report/cheetah_report.pdf cheetah_report-${TRAVIS_BUILD_NUMBER}.pdf
+- echo "<a href=\"cheetah_report-${TRAVIS_BUILD_NUMBER}.pdf\">cheetah_report-${TRAVIS_BUILD_NUMBER}.pdf</a>" >> index.html
 
 - git add -A
 - git commit -m "Travis CI autocommit from travis build ${TRAVIS_BUILD_NUMBER}"
 
-- git push -q origin master > /dev/null
+- git push -q origin gh-pages > /dev/null
 
 notifications:
 - email: false
