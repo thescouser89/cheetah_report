@@ -13,7 +13,7 @@ after_success:
 
 - cd report_for_cheetah/
 - cp -f $HOME/build/thescouser89/cheetah_report/cheetah_report.pdf cheetah_report-${TRAVIS_BUILD_NUMBER}.pdf
-- echo "<a href=\"cheetah_report-${TRAVIS_BUILD_NUMBER}.pdf\">cheetah_report-${TRAVIS_BUILD_NUMBER}.pdf</a>" >> index.html
+- echo "<a href=\"cheetah_report-${TRAVIS_BUILD_NUMBER}.pdf\">cheetah_report-${TRAVIS_BUILD_NUMBER}.pdf</a><br/>" >> index.html
 
 - git add -A
 - git commit -m "Travis CI autocommit from travis build ${TRAVIS_BUILD_NUMBER}"
