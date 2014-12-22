@@ -109,11 +109,12 @@ The RowCol store (shown in Figure~\ref{fig:row_col_store}) is a hybrid store tha
 
 The main program is the Simple Query Executor and it uses Cheetah’s store engine to store sparse data and run queries on it. The program reads in the JSON data and stores the data depending on the chosen store type: row store, column store, or row-column hybrid store. Then a batch of SQL read-queries is executed. Each query is read and performed sequentially. For each query, the Simple Query Executor program parses the query, then calls the store engine to execute the query. When the store engine executes the query, it overwrites a ResultSet object. The program then prints the results and brief runtime statistics based on what is stored in the ResultSet. This process is repeated for all subsequent queries, which clear and overwrite the ResultSet. Figure~\cite{fig_sequential_query} below illustrates the program flow:
 
-\begin{figure*}
+\begin{figure}[!t]
+\centering
 \includegraphics[height=3in]{images/query_sequential}
 \caption{Flow of sequential Simple Query Executor}
 \label{fig_sequential_query}
-\end{figure*}
+\end{figure}
 
 \subsection{Threads}
 A thread is the smallest executing context provided by an operating system. At its lowest level, a thread maintains an independent set of values for the processor registers, such as the program counter. That means that threads executing in the same process can potentially share resources such as memory, and instruction code, while executing different parts of the code due to each thread having their own program counter. A single threaded processor switches between different threads by time-division multiplexing to give the illusion of threads running at the same time for the user. More recently with the popularity of multiprocessors, each thread can truly run at the same time by being executed by different processors at the same time.
@@ -170,21 +171,20 @@ In the sequential program, each query is performed one after the other. The Resu
 In the parallel program flow, the Simple Query Executor still starts by reading in the JSON sparse database. Using the thread-based approach, the idea is to have each Query object executed as a runnable object. The program initializes a fixed thread pool that will handle query execution. From this point, two variants of the program were explored to parallelize the Query execution.
 
 
-In the first variant, an additional thread is created. This thread holds the print queue which accepts queries that have finished execution and will print out results based on the result set’s contents. The query execution itself handles parsing of the query string and execution of the query. This method was deemed not feasible since it requires copying and storing the result set into the query and passing it to the print queue. At the speed the queries were executing, the program easily ran out of memory. Figure XYZ below outlines the program flow for the first variant.
+In the first variant (shown in Figure~\ref{fig:parallel_print_queue}), an additional thread is created. This thread holds the print queue which accepts queries that have finished execution and will print out results based on the result set’s contents. The query execution itself handles parsing of the query string and execution of the query. This method was deemed not feasible since it requires copying and storing the result set into the query and passing it to the print queue. At the speed the queries were executing, the program easily ran out of memory. Figure XYZ below outlines the program flow for the first variant.
 
 \begin{figure*}
-\includegraphics[height=3in]{images/query_parallel}
-\caption{Parallelized Query Execution with Print Queue}
-\label{fig_parallel_query}
-\end{figure*}
+\captionsetup{justification=centering}
+\centerline{\subfigure[Parallelized Query Execution with Print Queue]{\includegraphics[width=5in]{images/parallel_print_queue} 
+\label{fig:parallel_print_queue}}
+\hfill
+\subfigure[Parallel query execution with result string computation for smaller memory footprint]{\includegraphics[width=3in]{images/parallel_actual}
+\label{fig:parallel_actual}}}
+\caption{Parallel architectures chosen for queries}
+\label{fig:parallel_query}
+\end{figure*} 
 
-In the second variant, for each thread in the threadpool, an associated ResultSet object is initialized in the store engine. The store engine is modified to contain a map of thread id and result set associations. This initialization was chosen to avoid having each query instantiate their own result sets. Since result sets each contain 3 large arrays, doing so would have been costly. There is no print queue thread in this program flow. Instead, the query handles parsing of the query string, execution of the query, and computing the string that needs to be printed based on the result set. By adding this string computation, we decrease the memory requirements for the query from a large result set to a small string. We also increase the time it takes to finish a query. However, this time was also additional in the original sequential program. Once all the queries have terminated execution, the results from each query are printed one after the other. The figure XYZ below illustrates the program flow with the result string computation.
-
-\begin{figure*}
-\includegraphics[height=3in]{images/query_parallel}
-\caption{Parallel query execution with result string computation for smaller memory footprint}
-\label{fig_parallel_query}
-\end{figure*}
+In the second variant (shown in Figure~\ref{fig:parallel_actual}), for each thread in the threadpool, an associated ResultSet object is initialized in the store engine. The store engine is modified to contain a map of thread id and result set associations. This initialization was chosen to avoid having each query instantiate their own result sets. Since result sets each contain 3 large arrays, doing so would have been costly. There is no print queue thread in this program flow. Instead, the query handles parsing of the query string, execution of the query, and computing the string that needs to be printed based on the result set. By adding this string computation, we decrease the memory requirements for the query from a large result set to a small string. We also increase the time it takes to finish a query. However, this time was also additional in the original sequential program. Once all the queries have terminated execution, the results from each query are printed one after the other. The figure XYZ below illustrates the program flow with the result string computation.
 
 The second method above is chosen for our experiments.
 
@@ -197,9 +197,14 @@ The Cheetah implementation provided to us did not support any write operations, 
 The insert statement adds a new record into the data store from a JSON object, which may be a tree-structure object, compared to traditional SQL-like insert, which specifies the new record in a flattened structure of key-value pairs.
 
 Example JSON object insert statement:
-$
-INSERT {"sparse_942": "GBRDCMI=", "nested_obj": {"num": 1394, "str": "GBRDCMBRGAYTCMJQGAYTA==="}, "sparse_940": "GBRDCMI=", …}
-$
+
+\begin{verbatim}
+INSERT {"sparse_942": "haha",
+        "nested_obj": {"num": 12, 
+                       "pew": "pao"}
+       }
+\end{verbatim}
+
 Similar to read queries, we have enhanced Cheetah to support parallel execution of insertions.
 
 
@@ -233,55 +238,95 @@ Due to limited time span of this project, we did not implement functionalities t
 
 
 \section{Experimental Results}
-These tests were run on a machine with 32 cores (Intel~\texttrademark Xeon~\texttrademark CPU E5-2660 at 2.2Ghz) with 47GB of RAM. For each test, the average of 5 runs is recorded.
+These tests were run on a machine with 32 cores (Intel~\textregistered Xeon~\textregistered CPU E5-2660 at 2.2Ghz) with 47GB of RAM. For each test, the average of 5 runs is recorded.
 
 \subsubsection{Parallel Read Queries}
-We compared the performance of parallel read-queries to that of sequential queries. In our experiment, we measure the total runtime to read and execute 50 queries in the original sequential program and in the new parallel program. The runtime data is collected for the parallel program running between one thread up to nine threads. In the charts below, the runtime and speedup is shown for the parallel program. As expected, the runtime decreases as we increase the number of threads in the thread pool. With one thread, the runtime is approximately 1500ms, whereas with two threads the runtime is approximately 850ms. We notice, however, that as more threads are added, we get diminishing returns in performance gains. This is more evident in the speedup graph. There is a near 2X speedup between one thread and two threads, and from three threads to eight threads, the speedup still increases but with smaller gains with each thread added. Finally at nine threads, there is actually a slowdown compared to running the program with eight threads. The diminishing gains can be attributed to context switching and cache misses as the number of threads increase. As the number of threads increase there is more contention so the cache gets rewritten more often in order to process the individual queries. We note that in the read-queries case, there should be no lock contention as it is assumed that no other queries are inserting or updating tables in the store engine.
 
-[insert figure]
+\begin{figure*}
+\captionsetup{justification=centering}
+\centerline{\subfigure{\includegraphics[width=4in]{images/runtime_vs_threads} 
+\label{fig:runtime_vs_threads}}
+\hfill
+\subfigure{\includegraphics[width=4in]{images/speedup_vs_threads}
+\label{fig:speedup_vs_threads}}}
+\caption{Runtime and Speedup vs number of threads for parallel program flow}
+\label{fig:speedup_reads}
+\end{figure*} 
 
-It’s interesting to note that there was also a significant performance increase between the original sequential program and the parallel program running with one thread. The original program executed all 50 read queries in approximately 7000ms whereas the parallel program running on one thread required only 1500ms. This discrepancy is perhaps due to the order in which query parsing, execution and result printing is performed. In the parallel program, all printing happens after all queries have been executed. The string to be printed were computed during parallel processing, however the actual print to standard output occurs sequentially in the main thread. In contrast, the sequential program computes the string to print and prints the string immediately after each query is executed. This causes many i/o synchronizations to occur during the batch execution of queries and slows down the program. We used the YourKit java profiler to get an estimate of the time it takes to execute and print queries. This profiler estimates the amount of time spent in each function in each thread. For the purposes of this experiment, we only took into account functions that were related to cheetah and focused on the execution of queries and the printing of results. The table below shows the percentage of time for query execution and printing:
+We compared the performance of parallel read-queries to that of sequential queries. In our experiment, we measure the total runtime to read and execute 50 queries in the original sequential program and in the new parallel program. The runtime data is collected for the parallel program running between one thread up to nine threads. In the charts below, the runtime and speedup is shown for the parallel program. As expected, the runtime decreases as we increase the number of threads in the thread pool as shown in Figure~\ref{speedup_reads}. With one thread, the runtime is approximately 1500ms, whereas with two threads the runtime is approximately 850ms. We notice, however, that as more threads are added, we get diminishing returns in performance gains. This is more evident in the speedup graph. There is a near 2X speedup between one thread and two threads, and from three threads to eight threads, the speedup still increases but with smaller gains with each thread added. Finally at nine threads, there is actually a slowdown compared to running the program with eight threads. The diminishing gains can be attributed to context switching and cache misses as the number of threads increase. As the number of threads increase there is more contention so the cache gets rewritten more often in order to process the individual queries. We note that in the read-queries case, there should be no lock contention as it is assumed that no other queries are inserting or updating tables in the store engine.
 
-[insert table]
 
- We see that a simple reorganization of the program flow achieves significant performance gains. In the sequential program, Query execution and result printing accounted for 9\% and 47\% of the execution time respectively. In the parallel program running with one thread, the query execution time was nearly undetectable by the java profiler and the printing of results accounted for 15\% of the execution time. 
+It’s interesting to note that there was also a significant performance increase between the original sequential program and the parallel program running with one thread. The original program executed all 50 read queries in approximately 7000ms whereas the parallel program running on one thread required only 1500ms. This discrepancy is perhaps due to the order in which query parsing, execution and result printing is performed. In the parallel program, all printing happens after all queries have been executed. The string to be printed were computed during parallel processing, however the actual print to standard output occurs sequentially in the main thread. In contrast, the sequential program computes the string to print and prints the string immediately after each query is executed. This causes many i/o synchronizations to occur during the batch execution of queries and slows down the program. We used the YourKit java profiler to get an estimate of the time it takes to execute and print queries. This profiler estimates the amount of time spent in each function in each thread. For the purposes of this experiment, we only took into account functions that were related to cheetah and focused on the execution of queries and the printing of results.
+
+\begin{table*}
+  \centering
+  \begin{tabular}{ |l || c | r |}
+    \hline
+     & \% of time for original sequential program & \% of parallel time for parallelized program (with 1 thread) \\ \hline\hline
+    Executing Query & 9\% & ~0\% \\ \hline
+    Printing Summary & 47\% & 15\% \\
+    \hline
+
+  \end{tabular}
+\caption{Speedup for query execution and printing}
+\label{table:speedup}
+\end{table*}
+
+
+We see from Table~\ref{table:speedup} that a simple reorganization of the program flow achieves significant performance gains. In the sequential program, Query execution and result printing accounted for 9\% and 47\% of the execution time respectively. In the parallel program running with one thread, the query execution time was nearly undetectable by the java profiler and the printing of results accounted for 15\% of the execution time. 
 
 
 \subsubsection{Parallel Inserts}
-Results demonstrate the performance gain when threading is used to parallel process 10K insertions. As shown in Figure XXXX1, there is a reduction of 36\% in execution time when two threads are used instead of one. However, as number of threads increase, the performance gain is diminishing. The performance starts to deteriorate gradually when more than seven threads are used.
+Results demonstrate the performance gain when threading is used to parallel process 10K insertions. As shown in Figure~\ref{fig:simple_lock}, there is a reduction of 36\% in execution time when two threads are used instead of one. However, as number of threads increase, the performance gain is diminishing. The performance starts to deteriorate gradually when more than seven threads are used.
 
-[insert figure]
+\begin{figure}[!t]
+\centering
+\includegraphics[width=3.5in]{images/simple_lock}
+\caption{Time taken to execute 10000 insert statements, into column data store protected by simple locking mechanism (coarse-grained) }
+\label{fig:simple_lock}
+\end{figure}
+
 
 At first glance the results look abnormal, as the speedup seems not possible as the coarse-grained lock implemented at the data store level would allow only one thread writing to the database at a time. As a result, parallel execution of inserts should bring no performance improvement. However, we discovered most of the time spent when executing the insert statement is on reading, parsing and flattening the tree-structured JSON object (using recursive functions). And parallelization actually helps that cause.
 
 
 \subsubsection{Evaluation of Lock Granularity}
 
-Another experiment we conducted is to compare the performance impact of coarse-grained vs. fine-grained lock. Our results show use of fine-grained lock increases execution time. As shown in Figure XXXX2, use of fine-grained locks introduces overhead, which is not seen when only a single lock (coarse-grained) is deployed. However, based on our experiment configuration, we do not observe the performance improvement when using fine-grained lock to protect individual data column, vs. coarse-grained lock to protect the entire data store.
+Another experiment we conducted is to compare the performance impact of coarse-grained vs. fine-grained lock. Our results show use of fine-grained lock increases execution time. As shown in Figure~\ref{fig:thousand_inserts}, use of fine-grained locks introduces overhead, which is not seen when only a single lock (coarse-grained) is deployed. However, based on our experiment configuration, we do not observe the performance improvement when using fine-grained lock to protect individual data column, vs. coarse-grained lock to protect the entire data store.
  
 At this stage, based on available data, one theory to explain the results is the actual time taken to execute the store procedures is too small a fraction. Therefore, the contention rarely occurs regardless of the sparseness (or density) of the data.
 
 
-[insert figure]
+\begin{figure}[!t]
+\centering
+\includegraphics[width=3.5in]{images/execution_thousand_inserts}
+\caption{Performance-wise, coarse-grained locking seems to be always better than fine-grained locking}
+\label{fig:thousand_inserts}
+\end{figure}
 
 
 \subsubsection{Evaluation of Simple Lock vs Reader-Writer Lock}
 Another aspect we experimented is the performance of the two locking protocol; single mutex lock and Reader-Writer lock. To do this, we have decided to create a workload that is closer to a real world scenario. Our workload consists of 50\% insert statements and 50\% read queries.
 
-Our results show that reader-writer lock seems to always perform better than simple lock. This is inline with our expectation, as simple lock blocks all concurrent threads attempting to read and write, while reader-writer lock permits concurrent read operations but only blocks everyone else when one thread acquires the writer/exclusive lock.
+Our results show that reader-writer lock seems to always perform better than simple lock (see Figure~\ref{fig:mixed_load}). This is inline with our expectation, as simple lock blocks all concurrent threads attempting to read and write, while reader-writer lock permits concurrent read operations but only blocks everyone else when one thread acquires the writer/exclusive lock.
 
-[insert figure]
+\begin{figure}[!t]
+\centering
+\includegraphics[width=3.5in]{images/mixed_load}
+\caption{Reader-Writer locks seems to perform better than simple lock.}
+\label{fig:mixed_load}
+\end{figure}
 
 
 \section{Related Work}
-Other approaches for in-memory databases have been previously studied. Redis is one of them. Redis is an open-source cache and store that is used extensively in the industry. Even though Cheetah stores JSON data, the JSON format is still very similar to a key-value format, where each attribute in the JSON object is a key. Redis is famously single-threaded and deals with all network query (and write) requests by using non-blocking IO coupled with an event-loop approach, which allows Redis to have a high throughput. There is a possibility to run Redis in a multi-process fashion by using Redis Cluster [citation needed]. This allows the Redis database to be spanned across several machines.
+Other approaches for in-memory databases have been previously studied. Redis is one of them. Redis is an open-source cache and store that is used extensively in the industry. Even though Cheetah stores JSON data, the JSON format is still very similar to a key-value format, where each attribute in the JSON object is a key. Redis is famously single-threaded and deals with all network query (and write) requests by using non-blocking IO coupled with an event-loop approach, which allows Redis to have a high throughput. There is a possibility to run Redis in a multi-process fashion by using Redis Cluster~\cite{redis-cluster}. This allows the Redis database to be spanned across several machines.
 
-Redis uses an adaptive scheme to save their key-value data. The most natural way of storing this data would be by using a highly-efficient hash structure.. However, for small key-value storage, they instead just encode them in an O(N) data structure, like a linear array with length-prefixed key value pairs [http://redis.io/topics/memory-optimization]. The hash will be converted into a real hash table as soon as the number of elements it contains will grow too much. since a linear array of key value pairs happens to play very well with the CPU cache (it has a better cache locality than a hash table). [same citation as above].
+Redis uses an adaptive scheme to save their key-value data. The most natural way of storing this data would be by using a highly-efficient hash structure.. However, for small key-value storage, they instead just encode them in an O(N) data structure, like a linear array with length-prefixed key value pairs~\cite{redis}. The hash will be converted into a real hash table as soon as the number of elements it contains will grow too much. since a linear array of key value pairs happens to play very well with the CPU cache (it has a better cache locality than a hash table). [same citation as above].
 
-On the data partitioning side, HYRISE is another in-memory database system that adopts a hybrid system for storing data. It dynamically partitions tables of varying widths depending on the most accessed columns. This contrasts with Cheetah which requires a schema to determine the layout of its tables for both the row and the rowcol store. HYRISE will alter their partitioning based on the nature of the queries. If there are queries that perform sequential scans (for example, to find values of a column who are within a range), they determined that narrow partitions perform better because of the improved cache locality. For operations that require a lot of inserts, updates or deletes, a wider partitioning is favored. Using a model that is able to predict the performance of the different partitionings, HYRISE will change the partitioning according to the nature of the queries. 
-[[cite the hyrise paper]
+On the data partitioning side, HYRISE~\cite{hyrise} is another in-memory database system that adopts a hybrid system for storing data. It dynamically partitions tables of varying widths depending on the most accessed columns. This contrasts with Cheetah which requires a schema to determine the layout of its tables for both the row and the rowcol store. HYRISE will alter their partitioning based on the nature of the queries. If there are queries that perform sequential scans (for example, to find values of a column who are within a range), they determined that narrow partitions perform better because of the improved cache locality. For operations that require a lot of inserts, updates or deletes, a wider partitioning is favored. Using a model that is able to predict the performance of the different partitionings, HYRISE will change the partitioning according to the nature of the queries. 
 
-The Argo Document store [citation needed] is the closest architecturally to the functionality and store design of Cheetah. They employ a very simple store that deconstructs the attributes in JSON data into keys and use a single table to store the object id, the key and its value. Similar to Cheetah, it also supports querying via SQL statements and supports INSERT, DELETE, JOINS, and SELECTs. Argo also uses threads while querying with JOINs, but doesn’t use threads for querying in general.
+
+The Argo Document store~\cite{argo} is the closest architecturally to the functionality and store design of Cheetah. They employ a very simple store that deconstructs the attributes in JSON data into keys and use a single table to store the object id, the key and its value. Similar to Cheetah, it also supports querying via SQL statements and supports INSERT, DELETE, JOINS, and SELECTs. Argo also uses threads while querying with JOINs, but doesn’t use threads for querying in general.
 
 
 \section{Conclusion and Future Work}
