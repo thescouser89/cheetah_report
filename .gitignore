@@ -1,3 +1,6 @@
 cheetah_report.pdf
 *.aux
 *.log
+*.bbl
+*.blg
+*.out
