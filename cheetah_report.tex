@@ -6,7 +6,7 @@
 pdfpagemode={UseOutlines},plainpages=false,pdfpagelabels=true,
 colorlinks=true,linkcolor={black},citecolor={black},pagecolor={black},
 urlcolor={black},
-pdftitle={Bare Demo of IEEEtran.cls for Computer Society Journals},%<!CHANGE!
+pdftitle={Making Cheetah Faster},%<!CHANGE!
 pdfsubject={Typesetting},%<!CHANGE!
 pdfauthor={Alan, Gary, and Dustin},%<!CHANGE!
 pdfkeywords={Data Analytics, In-memory database, Concurrency}
@@ -18,6 +18,7 @@ pdfkeywords={Data Analytics, In-memory database, Concurrency}
 \usepackage{hyperref}
 \usepackage{graphicx}
 \usepackage{subfigure}
+\usepackage{textcomp}
 
 
 \begin{document}
@@ -120,7 +121,7 @@ The main program is the Simple Query Executor and it uses Cheetah’s store engi
 A thread is the smallest executing context provided by an operating system. At its lowest level, a thread maintains an independent set of values for the processor registers, such as the program counter. That means that threads executing in the same process can potentially share resources such as memory, and instruction code, while executing different parts of the code due to each thread having their own program counter. A single threaded processor switches between different threads by time-division multiplexing to give the illusion of threads running at the same time for the user. More recently with the popularity of multiprocessors, each thread can truly run at the same time by being executed by different processors at the same time.
 
 
-To run a thread in Java, we can either declare a class that extends the Thread class, or have the class implement the Runnable interface. The advantage of using the Runnable interface is that a class can implement multiple interfaces, but can only extend one class. As such, using the Runnable interface has the advantage of requiring less modifications in their existing class. Another advantage of the Runnable interface is that it can be used directly with Java’s implementation of a Thread pool. 
+To run a thread in Java, we can either declare a class that extends the Thread class, or have the class implement the Runnable interface. The advantage of using the Runnable interface is that a class can implement multiple interfaces, but can only extend one class. As such, using the Runnable interface has the advantage of requiring less modifications in their existing class. Another advantage of the Runnable interface is that it can be used directly with Java\textquotesingle s implementation of a Thread pool. 
 
 \subsection{Queries}
 
@@ -135,7 +136,7 @@ As mentioned before in the column store subsection, a table will contain two col
 
 There is an intrinsic connection between the object id and the value, where the object id is the ‘key’ to the value. As such, it is natural to explore other data structures that implement a key-value structure, like a Map or a Hash.
 
-We therefore explore the use of Java’s HashMap and TreeMap (which is implemented as a red-black tree, which is always balanced) as alternatives to the array structure. While performing some benchmark tests on these alternate data structures, we notice a huge performance drop.
+We therefore explore the use of Java\textquotesingle s HashMap and TreeMap (which is implemented as a red-black tree, which is always balanced) as alternatives to the array structure. While performing some benchmark tests on these alternate data structures, we notice a huge performance drop.
 
 \begin{figure*}
 \captionsetup{justification=centering}
@@ -256,7 +257,7 @@ These tests were run on a machine with 32 cores (Intel~\textregistered Xeon~\tex
 We compared the performance of parallel read-queries to that of sequential queries. In our experiment, we measure the total runtime to read and execute 50 queries in the original sequential program and in the new parallel program. The runtime data is collected for the parallel program running between one thread up to nine threads. In the charts below, the runtime and speedup is shown for the parallel program. As expected, the runtime decreases as we increase the number of threads in the thread pool as shown in Figure~\ref{fig:speedup_reads}. With one thread, the runtime is approximately 1500ms, whereas with two threads the runtime is approximately 850ms. We notice, however, that as more threads are added, we get diminishing returns in performance gains. This is more evident in the speedup graph. There is a near 2X speedup between one thread and two threads, and from three threads to eight threads, the speedup still increases but with smaller gains with each thread added. Finally at nine threads, there is actually a slowdown compared to running the program with eight threads. The diminishing gains can be attributed to context switching and cache misses as the number of threads increase. As the number of threads increase there is more contention so the cache gets rewritten more often in order to process the individual queries. We note that in the read-queries case, there should be no lock contention as it is assumed that no other queries are inserting or updating tables in the store engine.
 
 
-It’s interesting to note that there was also a significant performance increase between the original sequential program and the parallel program running with one thread. The original program executed all 50 read queries in approximately 7000ms whereas the parallel program running on one thread required only 1500ms. This discrepancy is perhaps due to the order in which query parsing, execution and result printing is performed. In the parallel program, all printing happens after all queries have been executed. The string to be printed were computed during parallel processing, however the actual print to standard output occurs sequentially in the main thread. In contrast, the sequential program computes the string to print and prints the string immediately after each query is executed. This causes many i/o synchronizations to occur during the batch execution of queries and slows down the program. We used the YourKit java profiler to get an estimate of the time it takes to execute and print queries. This profiler estimates the amount of time spent in each function in each thread. For the purposes of this experiment, we only took into account functions that were related to cheetah and focused on the execution of queries and the printing of results.
+It’s interesting to note that there was also a significant performance increase between the original sequential program and the parallel program running with one thread. The original program executed all 50 read queries in approximately 7000ms whereas the parallel program running on one thread required only 1500ms. This discrepancy is perhaps due to the order in which query parsing, execution and result printing is performed. In the parallel program, all printing happens after all queries have been executed. The string to be printed were computed during parallel processing, however the actual print to standard output occurs sequentially in the main thread. In contrast, the sequential program computes the string to print and prints the string immediately after each query is executed. This causes many i/o synchronizations to occur during the batch execution of queries and slows down the program. We used the YourKit Java profiler to get an estimate of the time it takes to execute and print queries. This profiler estimates the amount of time spent in each function in each thread. For the purposes of this experiment, we only took into account functions that were related to cheetah and focused on the execution of queries and the printing of results.
 
 \begin{table*}
   \centering
@@ -273,7 +274,7 @@ It’s interesting to note that there was also a significant performance increas
 \end{table*}
 
 
-We see from Table~\ref{table:speedup} that a simple reorganization of the program flow achieves significant performance gains. In the sequential program, Query execution and result printing accounted for 9\% and 47\% of the execution time respectively. In the parallel program running with one thread, the query execution time was nearly undetectable by the java profiler and the printing of results accounted for 15\% of the execution time. 
+We see from Table~\ref{table:speedup} that a simple reorganization of the program flow achieves significant performance gains. In the sequential program, Query execution and result printing accounted for 9\% and 47\% of the execution time respectively. In the parallel program running with one thread, the query execution time was nearly undetectable by the Java profiler and the printing of results accounted for 15\% of the execution time. 
 
 
 \subsubsection{Parallel Inserts}
